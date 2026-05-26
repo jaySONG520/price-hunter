@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+data/
+*.db
+*.sqlite
+.env
+dist/
+build/
+server.log
+server.err.log
+price-hunter-screenshot.png
+memory/
+tools/

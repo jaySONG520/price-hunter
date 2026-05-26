@@ -1,0 +1,32 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8765
+  },
+  "costs": {
+    "xianyu_fee_rate": 0.006,
+    "default_shipping": 18,
+    "default_packaging": 6,
+    "default_bargain_rate": 0.02,
+    "min_profit_rate": 0.06,
+    "min_profit_amount": 200
+  },
+  "platforms": {
+    "jd": {
+      "app_key": "",
+      "app_secret": "",
+      "enabled": false
+    },
+    "taobao": {
+      "app_key": "",
+      "app_secret": "",
+      "adzone_id": "",
+      "enabled": false
+    },
+    "douyin": {
+      "app_key": "",
+      "app_secret": "",
+      "enabled": false
+    }
+  }
+}

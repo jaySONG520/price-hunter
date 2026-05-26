@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Price Hunter</title>
+  <style>
+    :root {
+      --ink: #18212f;
+      --muted: #647084;
+      --line: #d8dee8;
+      --paper: #f7f8fb;
+      --panel: #ffffff;
+      --blue: #2457d6;
+      --green: #0f8a5f;
+      --amber: #a76200;
+      --red: #bd2b38;
+      --violet: #5d3bbf;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 22px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    button, input, textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 8px 11px;
+      cursor: pointer;
+      min-height: 36px;
+    }
+
+    button.primary {
+      border-color: var(--blue);
+      background: var(--blue);
+      color: #ffffff;
+    }
+
+    button.danger {
+      color: var(--red);
+      border-color: #ebb7bd;
+    }
+
+    button:hover {
+      filter: brightness(0.98);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr);
+      gap: 18px;
+      padding: 18px;
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+
+    section, .product {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    section {
+      padding: 16px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      background: #ffffff;
+      padding: 9px 10px;
+      min-width: 0;
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .products {
+      display: grid;
+      gap: 14px;
+    }
+
+    .product {
+      overflow: hidden;
+    }
+
+    .product-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcff;
+    }
+
+    .product-title {
+      min-width: 0;
+    }
+
+    .product-title strong {
+      display: block;
+      overflow-wrap: anywhere;
+      font-size: 17px;
+      margin-bottom: 4px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(110px, 1fr));
+      border-bottom: 1px solid var(--line);
+    }
+
+    .metric {
+      padding: 12px 14px;
+      border-right: 1px solid var(--line);
+      min-width: 0;
+    }
+
+    .metric:last-child {
+      border-right: 0;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .metric b {
+      display: block;
+      font-size: 17px;
+      overflow-wrap: anywhere;
+    }
+
+    .recommendation {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .BUY { background: var(--green); }
+    .WATCH { background: var(--amber); }
+    .PASS { background: var(--red); }
+    .DATA_WEAK { background: var(--violet); }
+
+    .product-body {
+      display: grid;
+      grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .subhead {
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 8px 7px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      background: #fafbfe;
+    }
+
+    td {
+      overflow-wrap: anywhere;
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .empty {
+      padding: 38px;
+      text-align: center;
+      color: var(--muted);
+      background: #ffffff;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+    }
+
+    @media (max-width: 1050px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+      .metrics {
+        grid-template-columns: repeat(3, minmax(110px, 1fr));
+      }
+      .product-body {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      main {
+        padding: 10px;
+      }
+      .grid2, .metrics {
+        grid-template-columns: 1fr;
+      }
+      .product-head {
+        grid-template-columns: 1fr;
+      }
+      .metric {
+        border-right: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Price Hunter</h1>
+      <div class="muted">电子数码买入价 vs 闲鱼卖出侧市场价</div>
+    </div>
+    <div class="actions">
+      <button id="demoBtn">载入示例</button>
+      <button id="refreshBtn" class="primary">刷新</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="stack">
+      <section>
+        <h2>添加商品</h2>
+        <form id="productForm" class="stack">
+          <label>商品名称
+            <input name="name" required placeholder="七彩虹 RTX 5070 战斧豪华版 12GB">
+          </label>
+          <label>当前一手到手价
+            <input name="buy_price" type="number" min="0" step="0.01" required placeholder="4399">
+          </label>
+          <label>一手平台链接
+            <input name="buy_url" placeholder="京东/淘宝/天猫/抖音商品链接">
+          </label>
+          <div class="grid2">
+            <label>必须包含关键词
+              <input name="include_keywords" placeholder="5070, 战斧">
+            </label>
+            <label>排除关键词
+              <input name="exclude_keywords" placeholder="5070ti, 整机">
+            </label>
+          </div>
+          <div class="grid2">
+            <label>运费
+              <input name="shipping" type="number" min="0" step="0.01" value="18">
+            </label>
+            <label>包装成本
+              <input name="packaging" type="number" min="0" step="0.01" value="6">
+            </label>
+          </div>
+          <div class="grid2">
+            <label>压价折扣
+              <input name="bargain_rate" type="number" min="0" max="1" step="0.001" value="0.02">
+            </label>
+            <label>最低利润率
+              <input name="min_profit_rate" type="number" min="0" max="1" step="0.001" value="0.06">
+            </label>
+          </div>
+          <label>最低利润金额
+            <input name="min_profit_amount" type="number" min="0" step="1" value="200">
+          </label>
+          <button class="primary" type="submit">添加</button>
+        </form>
+      </section>
+
+      <section>
+        <h2>计算规则</h2>
+        <div class="muted">
+          闲鱼平台成本/风险金固定为预计成交价的 0.6%，不封顶。预计成交价按闲鱼中位挂牌价扣除压价折扣计算。
+        </div>
+      </section>
+    </div>
+
+    <div class="products" id="products"></div>
+  </main>
+
+  <script>
+    const productsEl = document.querySelector("#products");
+    const productForm = document.querySelector("#productForm");
+
+    const money = value => value === null || value === undefined ? "-" : "¥" + Number(value).toFixed(2);
+    const percent = value => value === null || value === undefined ? "-" : (Number(value) * 100).toFixed(2) + "%";
+    const splitWords = value => (value || "").split(",").map(item => item.trim()).filter(Boolean);
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        headers: { "Content-Type": "application/json" },
+        ...options
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "请求失败");
+      return data;
+    }
+
+    async function loadState() {
+      const data = await api("/api/state");
+      render(data.products);
+    }
+
+    function recommendationText(code) {
+      return {
+        BUY: "可以买",
+        WATCH: "观察",
+        PASS: "不买",
+        DATA_WEAK: "样本不足"
+      }[code] || code;
+    }
+
+    function render(items) {
+      if (!items.length) {
+        productsEl.innerHTML = `<div class="empty">还没有商品。先添加一个电子数码商品，或载入示例。</div>`;
+        return;
+      }
+
+      productsEl.innerHTML = items.map(item => productTemplate(item)).join("");
+      bindProductActions();
+    }
+
+    function productTemplate(item) {
+      const { product, samples, analysis, links } = item;
+      const stats = analysis.stats;
+      const rows = samples.slice(0, 20).map(sample => `
+        <tr>
+          <td>${escapeHtml(sample.title)}</td>
+          <td>${money(sample.price)}</td>
+          <td>${escapeHtml(sample.condition || "-")}</td>
+          <td><button class="danger" data-delete-sample="${sample.id}">删</button></td>
+        </tr>
+      `).join("");
+
+      const linkButtons = links.map(link => `
+        <button data-open="${escapeHtml(link.url)}">${escapeHtml(link.name)}</button>
+      `).join("");
+
+      return `
+        <article class="product" data-product-id="${product.id}">
+          <div class="product-head">
+            <div class="product-title">
+              <strong>${escapeHtml(product.name)}</strong>
+              <div class="muted">${escapeHtml(product.category)} · 包含 ${product.include_keywords.join(" / ") || "-"} · 排除 ${product.exclude_keywords.join(" / ") || "-"}</div>
+            </div>
+            <div class="actions">
+              ${product.buy_url ? `<button data-open="${escapeHtml(product.buy_url)}">买入页</button>` : ""}
+              <button class="danger" data-delete-product="${product.id}">删除商品</button>
+            </div>
+          </div>
+
+          <div class="metrics">
+            <div class="metric"><span>买入价</span><b>${money(product.buy_price)}</b></div>
+            <div class="metric"><span>闲鱼中位价</span><b>${money(stats.median)}</b></div>
+            <div class="metric"><span>预计成交价</span><b>${money(analysis.estimated_resale_price)}</b></div>
+            <div class="metric"><span>0.6% 成本</span><b>${money(analysis.xianyu_fee)}</b></div>
+            <div class="metric"><span>预计净利润</span><b>${money(analysis.profit)}</b></div>
+            <div class="metric"><span>利润率</span><b>${percent(analysis.profit_rate)}</b></div>
+          </div>
+
+          <div class="product-body">
+            <div>
+              <div class="subhead">
+                <span class="recommendation ${analysis.recommendation}">${recommendationText(analysis.recommendation)}</span>
+              </div>
+              <div class="muted">${escapeHtml(analysis.reason)}</div>
+              <div class="links">${linkButtons}</div>
+              <form class="sampleForm stack" data-product-id="${product.id}">
+                <label>粘贴闲鱼搜索结果文本
+                  <textarea name="text" placeholder="一行标题，一行价格；或从搜索结果复制多条文本"></textarea>
+                </label>
+                <button type="submit" class="primary">解析并导入样本</button>
+              </form>
+            </div>
+
+            <div>
+              <div class="subhead">闲鱼样本 ${samples.length} 条</div>
+              <table>
+                <thead>
+                  <tr><th>标题</th><th>价格</th><th>标签</th><th></th></tr>
+                </thead>
+                <tbody>${rows || `<tr><td colspan="4" class="muted">暂无样本</td></tr>`}</tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function bindProductActions() {
+      document.querySelectorAll("[data-open]").forEach(button => {
+        button.addEventListener("click", async () => {
+          await api("/api/open", {
+            method: "POST",
+            body: JSON.stringify({ url: button.dataset.open })
+          });
+        });
+      });
+
+      document.querySelectorAll("[data-delete-product]").forEach(button => {
+        button.addEventListener("click", async () => {
+          await fetch(`/api/products/${button.dataset.deleteProduct}`, { method: "DELETE" });
+          await loadState();
+        });
+      });
+
+      document.querySelectorAll("[data-delete-sample]").forEach(button => {
+        button.addEventListener("click", async () => {
+          await fetch(`/api/samples/${button.dataset.deleteSample}`, { method: "DELETE" });
+          await loadState();
+        });
+      });
+
+      document.querySelectorAll(".sampleForm").forEach(form => {
+        form.addEventListener("submit", async event => {
+          event.preventDefault();
+          const text = new FormData(form).get("text");
+          await api("/api/xianyu/import", {
+            method: "POST",
+            body: JSON.stringify({ product_id: Number(form.dataset.productId), text })
+          });
+          form.reset();
+          await loadState();
+        });
+      });
+    }
+
+    productForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = new FormData(productForm);
+      await api("/api/products", {
+        method: "POST",
+        body: JSON.stringify({
+          name: form.get("name"),
+          category: "电子数码",
+          buy_price: Number(form.get("buy_price")),
+          buy_url: form.get("buy_url"),
+          include_keywords: splitWords(form.get("include_keywords")),
+          exclude_keywords: splitWords(form.get("exclude_keywords")),
+          shipping: Number(form.get("shipping")),
+          packaging: Number(form.get("packaging")),
+          bargain_rate: Number(form.get("bargain_rate")),
+          min_profit_rate: Number(form.get("min_profit_rate")),
+          min_profit_amount: Number(form.get("min_profit_amount"))
+        })
+      });
+      productForm.reset();
+      productForm.shipping.value = "18";
+      productForm.packaging.value = "6";
+      productForm.bargain_rate.value = "0.02";
+      productForm.min_profit_rate.value = "0.06";
+      productForm.min_profit_amount.value = "200";
+      await loadState();
+    });
+
+    document.querySelector("#refreshBtn").addEventListener("click", loadState);
+    document.querySelector("#demoBtn").addEventListener("click", async () => {
+      await api("/api/demo", { method: "POST", body: "{}" });
+      await loadState();
+    });
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    loadState().catch(error => {
+      productsEl.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+    });
+  </script>
+</body>
+</html>
