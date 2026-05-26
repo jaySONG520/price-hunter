@@ -12,8 +12,9 @@ from .config import load_config, public_config_status
 from .db import Database, ROOT
 from .engine import CostRule, analyze_arbitrage
 from .jd import JDUnionClient, JDUnionConfig, extract_goods_items, unwrap_jd_response
+from .no_key import parse_offer_text
 from .parser import parse_xianyu_text
-from .platforms import search_links
+from .platforms import history_links, search_links
 
 
 WEB_ROOT = ROOT / "web"
@@ -36,8 +37,8 @@ class PriceHunterHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        payload = self.read_json()
         try:
+            payload = self.read_json()
             self.handle_api_post(parsed.path, payload)
         except Exception as exc:
             self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
@@ -71,6 +72,7 @@ class PriceHunterHandler(BaseHTTPRequestHandler):
                     "samples": samples,
                     "analysis": self.analysis(product, samples),
                     "links": search_links(" ".join(product["include_keywords"]) or product["name"]),
+                    "history_links": history_links(product["buy_url"] or product["name"]),
                 })
             self.send_json({"products": payload, "config": public_config_status(config)})
             return
@@ -82,6 +84,11 @@ class PriceHunterHandler(BaseHTTPRequestHandler):
         if path == "/api/search-links":
             term = query.get("q", [""])[0]
             self.send_json({"links": search_links(term)})
+            return
+
+        if path == "/api/history-links":
+            term = query.get("q", [""])[0]
+            self.send_json({"links": history_links(term)})
             return
 
         self.send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
@@ -116,6 +123,37 @@ class PriceHunterHandler(BaseHTTPRequestHandler):
             ]
             created = self.db.add_samples(samples)
             self.send_json({"created": created, "count": len(created)})
+            return
+
+        if path == "/api/no-key/parse":
+            offers = parse_offer_text(
+                text=payload.get("text", ""),
+                platform=payload.get("platform", "manual"),
+                include=payload.get("include_keywords") or [],
+                exclude=payload.get("exclude_keywords") or ["二手", "维修", "配件", "定金", "订金"],
+            )
+            self.send_json({"items": offers, "count": len(offers)})
+            return
+
+        if path == "/api/no-key/import":
+            item = payload.get("item") or {}
+            title = item.get("title") or item.get("name") or ""
+            if not title:
+                raise ValueError("缺少商品标题，不能导入。")
+            product = self.db.create_product({
+                "name": title,
+                "category": "电子数码",
+                "buy_price": float(item.get("price") or item.get("buy_price") or 0),
+                "buy_url": item.get("source_url") or "",
+                "include_keywords": self.keywords_from_name(title),
+                "exclude_keywords": ["二手", "维修", "配件", "定金", "订金", "整机"],
+                "shipping": float(payload.get("shipping") or 18),
+                "packaging": float(payload.get("packaging") or 6),
+                "bargain_rate": 0.02,
+                "min_profit_rate": 0.06,
+                "min_profit_amount": 200,
+            })
+            self.send_json({"product": product})
             return
 
         if path == "/api/jd/search":
@@ -336,7 +374,14 @@ class PriceHunterHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         if length == 0:
             return {}
-        raw = self.rfile.read(length).decode("utf-8")
+        data = self.rfile.read(length)
+        try:
+            raw = data.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                raw = data.decode("gb18030")
+            except UnicodeDecodeError:
+                raw = data.decode("utf-8", errors="replace")
         return json.loads(raw)
 
     def send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:

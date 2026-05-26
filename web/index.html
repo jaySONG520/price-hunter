@@ -414,6 +414,36 @@
       </section>
 
       <section>
+        <h2>No-Key 比价</h2>
+        <form id="noKeyForm" class="stack">
+          <div class="grid2">
+            <label>平台
+              <input name="platform" value="jd" placeholder="jd / taobao / tmall / douyin">
+            </label>
+            <label>关键词
+              <input name="keyword" placeholder="5070 战斧">
+            </label>
+          </div>
+          <div class="grid2">
+            <label>必须包含
+              <input name="include_keywords" placeholder="5070, 战斧">
+            </label>
+            <label>排除
+              <input name="exclude_keywords" value="二手, 维修, 配件, 定金, 订金">
+            </label>
+          </div>
+          <label>粘贴平台搜索结果文本
+            <textarea name="text" placeholder="从京东/淘宝/天猫/抖音搜索页复制商品标题和价格；程序只解析你粘贴的文本"></textarea>
+          </label>
+          <div class="actions">
+            <button type="submit" class="primary">解析文本</button>
+            <button type="button" id="openHistoryBtn">打开历史价工具</button>
+          </div>
+        </form>
+        <div id="noKeyResults" class="jd-results"></div>
+      </section>
+
+      <section>
         <h2>京东 API</h2>
         <div id="jdStatus" class="status off">未配置</div>
         <form id="jdSearchForm" class="stack" style="margin-top: 12px;">
@@ -452,6 +482,8 @@
   <script>
     const productsEl = document.querySelector("#products");
     const productForm = document.querySelector("#productForm");
+    const noKeyForm = document.querySelector("#noKeyForm");
+    const noKeyResultsEl = document.querySelector("#noKeyResults");
     const jdSearchForm = document.querySelector("#jdSearchForm");
     const jdStatusEl = document.querySelector("#jdStatus");
     const jdResultsEl = document.querySelector("#jdResults");
@@ -531,8 +563,33 @@
       bindJdActions();
     }
 
+    function renderNoKeyResults(items) {
+      if (!items.length) {
+        noKeyResultsEl.innerHTML = `<div class="muted">没有解析到商品。复制时尽量包含“标题 + ¥价格”或“标题 + 价格元”。</div>`;
+        return;
+      }
+
+      noKeyResultsEl.innerHTML = items.map((item, index) => `
+        <div class="jd-item">
+          <div class="jd-title">${escapeHtml(item.title || "未命名商品")}</div>
+          <div class="jd-meta">
+            <span>${escapeHtml(item.platform || "manual")}</span>
+            <span>价格 ${money(item.price)}</span>
+            <span>置信度 ${percent(item.confidence)}</span>
+          </div>
+          <div class="actions">
+            ${item.source_url ? `<button data-open="${escapeHtml(item.source_url)}">来源页</button>` : ""}
+            <button data-import-nokey="${index}">导入套利库</button>
+          </div>
+        </div>
+      `).join("");
+      window.noKeyLastItems = items;
+      bindProductActions();
+      bindNoKeyActions();
+    }
+
     function productTemplate(item) {
-      const { product, samples, analysis, links } = item;
+      const { product, samples, analysis, links, history_links } = item;
       const stats = analysis.stats;
       const rows = samples.slice(0, 20).map(sample => `
         <tr>
@@ -544,6 +601,9 @@
       `).join("");
 
       const linkButtons = links.map(link => `
+        <button data-open="${escapeHtml(link.url)}">${escapeHtml(link.name)}</button>
+      `).join("");
+      const historyButtons = (history_links || []).map(link => `
         <button data-open="${escapeHtml(link.url)}">${escapeHtml(link.name)}</button>
       `).join("");
 
@@ -576,6 +636,7 @@
               </div>
               <div class="muted">${escapeHtml(analysis.reason)}</div>
               <div class="links">${linkButtons}</div>
+              <div class="links">${historyButtons}</div>
               <form class="sampleForm stack" data-product-id="${product.id}">
                 <label>粘贴闲鱼搜索结果文本
                   <textarea name="text" placeholder="一行标题，一行价格；或从搜索结果复制多条文本"></textarea>
@@ -689,6 +750,22 @@
       });
     }
 
+    function bindNoKeyActions() {
+      document.querySelectorAll("[data-import-nokey]").forEach(button => {
+        if (button.dataset.boundImportNoKey) return;
+        button.dataset.boundImportNoKey = "1";
+        button.addEventListener("click", async () => {
+          const item = window.noKeyLastItems?.[Number(button.dataset.importNokey)];
+          if (!item) return;
+          await api("/api/no-key/import", {
+            method: "POST",
+            body: JSON.stringify({ item })
+          });
+          await loadState();
+        });
+      });
+    }
+
     productForm.addEventListener("submit", async event => {
       event.preventDefault();
       const form = new FormData(productForm);
@@ -721,6 +798,37 @@
     document.querySelector("#demoBtn").addEventListener("click", async () => {
       await api("/api/demo", { method: "POST", body: "{}" });
       await loadState();
+    });
+
+    noKeyForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = new FormData(noKeyForm);
+      noKeyResultsEl.innerHTML = `<div class="muted">正在解析粘贴文本...</div>`;
+      try {
+        const data = await api("/api/no-key/parse", {
+          method: "POST",
+          body: JSON.stringify({
+            platform: form.get("platform"),
+            text: form.get("text"),
+            include_keywords: splitWords(form.get("include_keywords")),
+            exclude_keywords: splitWords(form.get("exclude_keywords"))
+          })
+        });
+        renderNoKeyResults(data.items);
+      } catch (error) {
+        noKeyResultsEl.innerHTML = `<div class="muted">${escapeHtml(error.message)}</div>`;
+      }
+    });
+
+    document.querySelector("#openHistoryBtn").addEventListener("click", async () => {
+      const keyword = new FormData(noKeyForm).get("keyword") || "";
+      const data = await api(`/api/history-links?q=${encodeURIComponent(keyword)}`);
+      for (const link of data.links) {
+        await api("/api/open", {
+          method: "POST",
+          body: JSON.stringify({ url: link.url })
+        });
+      }
     });
 
     jdSearchForm.addEventListener("submit", async event => {

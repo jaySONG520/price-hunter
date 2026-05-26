@@ -2,6 +2,7 @@ import unittest
 
 from price_hunter.engine import CostRule, analyze_arbitrage, market_stats
 from price_hunter.jd import extract_goods_items, jd_timestamp, sign_params, unwrap_jd_response
+from price_hunter.no_key import parse_offer_text
 from price_hunter.parser import parse_xianyu_text
 
 
@@ -75,6 +76,18 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(items[0]["buy_price"], 4399)
         self.assertEqual(items[0]["coupon_discount"], 200)
         self.assertEqual(items[0]["material_url"], "https://item.jd.com/123.html")
+
+    def test_no_key_parser_reads_visible_offer_text(self):
+        text = """
+        七彩虹 RTX 5070 战斧豪华版 12GB 显卡
+        ¥4399
+        RTX 5070 战斧 配件支架
+        ¥99
+        """
+        offers = parse_offer_text(text, platform="jd", include=["5070", "战斧"], exclude=["配件"])
+        self.assertEqual(len(offers), 1)
+        self.assertEqual(offers[0]["price"], 4399)
+        self.assertEqual(offers[0]["platform"], "jd")
 
 
 if __name__ == "__main__":
