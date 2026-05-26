@@ -31,6 +31,63 @@ http://127.0.0.1:8765
 .\run.ps1
 ```
 
+## 京东 API 配置
+
+把 `config.example.json` 复制为 `config.local.json`，只在本地填写密钥，不要提交到 GitHub。
+
+```json
+{
+  "platforms": {
+    "jd": {
+      "enabled": true,
+      "server_url": "https://router.jd.com/api",
+      "app_key": "你的京东联盟 app_key",
+      "app_secret": "你的京东联盟 app_secret",
+      "site_id": "网站/APP/流量媒体 ID",
+      "pid": "联盟ID_应用ID_推广位ID",
+      "position_id": "推广位 ID",
+      "union_id": "联盟 ID",
+      "auth_key": "联盟官网-我的工具-我的API里的授权 Key"
+    }
+  }
+}
+```
+
+也可以用环境变量覆盖：
+
+```powershell
+$env:JD_ENABLED="true"
+$env:JD_APP_KEY="..."
+$env:JD_APP_SECRET="..."
+$env:JD_SITE_ID="..."
+$env:JD_PID="..."
+```
+
+当前已接入的京东联盟接口：
+
+- `jd.union.open.goods.query`：关键词商品查询。
+- `jd.union.open.goods.bigfield.query`：商品大字段详情。
+- `jd.union.open.coupon.query`：优惠券领取情况查询。
+- `jd.union.open.promotion.common.get`：商品/券转推广链接。
+- `jd.union.open.category.goods.get`：商品类目查询。
+- `jd.union.open.user.pid.get`：获取 PID。
+- `jd.union.open.position.create` / `jd.union.open.position.query`：推广位创建和查询。
+- `jd.union.open.goods.jingfen.query`：京粉精选商品。
+- `jd.union.open.goods.rank.query`：联盟实时热销榜，默认使用数码家电榜 `200006`。
+
+本地后端对应入口：
+
+- `POST /api/jd/search`
+- `POST /api/jd/bigfield`
+- `POST /api/jd/coupon`
+- `POST /api/jd/promotion`
+- `POST /api/jd/category`
+- `POST /api/jd/pid`
+- `POST /api/jd/position/query`
+- `POST /api/jd/position/create`
+- `POST /api/jd/jingfen`
+- `POST /api/jd/rank`
+
 ## 闲鱼成本规则
 
 按你的要求，闲鱼卖出侧固定计入：
@@ -76,4 +133,3 @@ http://127.0.0.1:8765
 - 隐藏自动化痕迹。
 - 代理池、多账号抢券。
 - 自动提交领券、下单或支付。
-

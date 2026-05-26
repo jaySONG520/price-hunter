@@ -147,6 +147,51 @@
       font-size: 13px;
     }
 
+    .status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #eef2ff;
+      color: var(--blue);
+    }
+
+    .status.off {
+      background: #fff3e0;
+      color: var(--amber);
+    }
+
+    .jd-results {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .jd-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fbfcff;
+    }
+
+    .jd-title {
+      font-weight: 700;
+      overflow-wrap: anywhere;
+      margin-bottom: 6px;
+    }
+
+    .jd-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
     .products {
       display: grid;
       gap: 14px;
@@ -367,6 +412,38 @@
           闲鱼平台成本/风险金固定为预计成交价的 0.6%，不封顶。预计成交价按闲鱼中位挂牌价扣除压价折扣计算。
         </div>
       </section>
+
+      <section>
+        <h2>京东 API</h2>
+        <div id="jdStatus" class="status off">未配置</div>
+        <form id="jdSearchForm" class="stack" style="margin-top: 12px;">
+          <label>关键词
+            <input name="keyword" required placeholder="5070 战斧">
+          </label>
+          <div class="grid2">
+            <label>页码
+              <input name="page_index" type="number" min="1" step="1" value="1">
+            </label>
+            <label>数量
+              <input name="page_size" type="number" min="1" max="30" step="1" value="10">
+            </label>
+          </div>
+          <div class="grid2">
+            <label>排序
+              <input name="sort_name" value="price">
+            </label>
+            <label>方向
+              <input name="sort" value="asc">
+            </label>
+          </div>
+          <button type="submit" class="primary">搜索京东</button>
+        </form>
+        <div class="actions" style="margin-top: 10px;">
+          <button id="jdJingfenBtn">数码精选</button>
+          <button id="jdRankBtn">数码热销榜</button>
+        </div>
+        <div id="jdResults" class="jd-results"></div>
+      </section>
     </div>
 
     <div class="products" id="products"></div>
@@ -375,6 +452,9 @@
   <script>
     const productsEl = document.querySelector("#products");
     const productForm = document.querySelector("#productForm");
+    const jdSearchForm = document.querySelector("#jdSearchForm");
+    const jdStatusEl = document.querySelector("#jdStatus");
+    const jdResultsEl = document.querySelector("#jdResults");
 
     const money = value => value === null || value === undefined ? "-" : "¥" + Number(value).toFixed(2);
     const percent = value => value === null || value === undefined ? "-" : (Number(value) * 100).toFixed(2) + "%";
@@ -393,6 +473,7 @@
     async function loadState() {
       const data = await api("/api/state");
       render(data.products);
+      renderJdStatus(data.config?.jd || {});
     }
 
     function recommendationText(code) {
@@ -412,6 +493,42 @@
 
       productsEl.innerHTML = items.map(item => productTemplate(item)).join("");
       bindProductActions();
+    }
+
+    function renderJdStatus(status) {
+      const configured = status.enabled && status.configured;
+      jdStatusEl.classList.toggle("off", !configured);
+      jdStatusEl.textContent = configured
+        ? `已配置 · ${status.has_site_id ? "有 site_id" : "缺 site_id"} · ${status.has_pid ? "有 PID" : "缺 PID"}`
+        : "未配置：复制 config.example.json 为 config.local.json，填写京东 app_key/app_secret 并启用 jd.enabled";
+    }
+
+    function renderJdResults(items, sourceLabel = "京东搜索") {
+      if (!items.length) {
+        jdResultsEl.innerHTML = `<div class="muted">${sourceLabel}没有返回商品。</div>`;
+        return;
+      }
+
+      jdResultsEl.innerHTML = items.map((item, index) => `
+        <div class="jd-item">
+          <div class="jd-title">${escapeHtml(item.name || "未命名商品")}</div>
+          <div class="jd-meta">
+            <span>SKU ${escapeHtml(item.sku_id || "-")}</span>
+            <span>标价 ${money(item.price)}</span>
+            <span>券后 ${money(item.coupon_price || item.buy_price)}</span>
+            <span>佣金 ${item.commission_share ?? "-"}%</span>
+          </div>
+          <div class="actions">
+            ${item.material_url ? `<button data-open="${escapeHtml(item.material_url)}">商品页</button>` : ""}
+            ${item.coupon_link ? `<button data-open="${escapeHtml(item.coupon_link)}">券链接</button>` : ""}
+            <button data-import-jd="${index}">导入套利库</button>
+            <button data-promote-jd="${index}">转推广链接</button>
+          </div>
+        </div>
+      `).join("");
+      window.jdLastItems = items;
+      bindProductActions();
+      bindJdActions();
     }
 
     function productTemplate(item) {
@@ -483,6 +600,8 @@
 
     function bindProductActions() {
       document.querySelectorAll("[data-open]").forEach(button => {
+        if (button.dataset.boundOpen) return;
+        button.dataset.boundOpen = "1";
         button.addEventListener("click", async () => {
           await api("/api/open", {
             method: "POST",
@@ -492,6 +611,8 @@
       });
 
       document.querySelectorAll("[data-delete-product]").forEach(button => {
+        if (button.dataset.boundDeleteProduct) return;
+        button.dataset.boundDeleteProduct = "1";
         button.addEventListener("click", async () => {
           await fetch(`/api/products/${button.dataset.deleteProduct}`, { method: "DELETE" });
           await loadState();
@@ -499,6 +620,8 @@
       });
 
       document.querySelectorAll("[data-delete-sample]").forEach(button => {
+        if (button.dataset.boundDeleteSample) return;
+        button.dataset.boundDeleteSample = "1";
         button.addEventListener("click", async () => {
           await fetch(`/api/samples/${button.dataset.deleteSample}`, { method: "DELETE" });
           await loadState();
@@ -506,6 +629,8 @@
       });
 
       document.querySelectorAll(".sampleForm").forEach(form => {
+        if (form.dataset.boundSampleForm) return;
+        form.dataset.boundSampleForm = "1";
         form.addEventListener("submit", async event => {
           event.preventDefault();
           const text = new FormData(form).get("text");
@@ -515,6 +640,51 @@
           });
           form.reset();
           await loadState();
+        });
+      });
+    }
+
+    function bindJdActions() {
+      document.querySelectorAll("[data-import-jd]").forEach(button => {
+        if (button.dataset.boundImportJd) return;
+        button.dataset.boundImportJd = "1";
+        button.addEventListener("click", async () => {
+          const item = window.jdLastItems?.[Number(button.dataset.importJd)];
+          if (!item) return;
+          await api("/api/jd/import", {
+            method: "POST",
+            body: JSON.stringify({ item })
+          });
+          await loadState();
+        });
+      });
+
+      document.querySelectorAll("[data-promote-jd]").forEach(button => {
+        if (button.dataset.boundPromoteJd) return;
+        button.dataset.boundPromoteJd = "1";
+        button.addEventListener("click", async () => {
+          const item = window.jdLastItems?.[Number(button.dataset.promoteJd)];
+          if (!item?.material_url) return;
+          try {
+            const data = await api("/api/jd/promotion", {
+              method: "POST",
+              body: JSON.stringify({
+                material_id: item.material_url,
+                coupon_url: item.coupon_link || ""
+              })
+            });
+            const clickURL = data.result?.data?.clickURL || data.result?.clickURL;
+            if (clickURL) {
+              await api("/api/open", {
+                method: "POST",
+                body: JSON.stringify({ url: clickURL })
+              });
+            } else {
+              alert("已调用转链接口，但响应里没有 clickURL。");
+            }
+          } catch (error) {
+            alert(error.message);
+          }
         });
       });
     }
@@ -551,6 +721,53 @@
     document.querySelector("#demoBtn").addEventListener("click", async () => {
       await api("/api/demo", { method: "POST", body: "{}" });
       await loadState();
+    });
+
+    jdSearchForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = new FormData(jdSearchForm);
+      jdResultsEl.innerHTML = `<div class="muted">正在请求京东 API...</div>`;
+      try {
+        const data = await api("/api/jd/search", {
+          method: "POST",
+          body: JSON.stringify({
+            keyword: form.get("keyword"),
+            page_index: Number(form.get("page_index")),
+            page_size: Number(form.get("page_size")),
+            sort_name: form.get("sort_name"),
+            sort: form.get("sort")
+          })
+        });
+        renderJdResults(data.items, "京东搜索");
+      } catch (error) {
+        jdResultsEl.innerHTML = `<div class="muted">${escapeHtml(error.message)}</div>`;
+      }
+    });
+
+    document.querySelector("#jdJingfenBtn").addEventListener("click", async () => {
+      jdResultsEl.innerHTML = `<div class="muted">正在读取京粉数码精选...</div>`;
+      try {
+        const data = await api("/api/jd/jingfen", {
+          method: "POST",
+          body: JSON.stringify({ elite_id: 24, page_size: 10 })
+        });
+        renderJdResults(data.items, "京粉数码精选");
+      } catch (error) {
+        jdResultsEl.innerHTML = `<div class="muted">${escapeHtml(error.message)}</div>`;
+      }
+    });
+
+    document.querySelector("#jdRankBtn").addEventListener("click", async () => {
+      jdResultsEl.innerHTML = `<div class="muted">正在读取数码家电热销榜...</div>`;
+      try {
+        const data = await api("/api/jd/rank", {
+          method: "POST",
+          body: JSON.stringify({ rank_id: 200006, sort_type: 3, page_size: 10 })
+        });
+        renderJdResults(data.items, "数码家电热销榜");
+      } catch (error) {
+        jdResultsEl.innerHTML = `<div class="muted">${escapeHtml(error.message)}</div>`;
+      }
     });
 
     function escapeHtml(value) {

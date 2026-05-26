@@ -8,8 +8,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from .config import load_config, public_config_status
 from .db import Database, ROOT
 from .engine import CostRule, analyze_arbitrage
+from .jd import JDUnionClient, JDUnionConfig, extract_goods_items, unwrap_jd_response
 from .parser import parse_xianyu_text
 from .platforms import search_links
 
@@ -59,6 +61,7 @@ class PriceHunterHandler(BaseHTTPRequestHandler):
 
     def handle_api_get(self, path: str, query: dict) -> None:
         if path == "/api/state":
+            config = load_config()
             products = self.db.list_products()
             payload = []
             for product in products:
@@ -69,7 +72,11 @@ class PriceHunterHandler(BaseHTTPRequestHandler):
                     "analysis": self.analysis(product, samples),
                     "links": search_links(" ".join(product["include_keywords"]) or product["name"]),
                 })
-            self.send_json({"products": payload})
+            self.send_json({"products": payload, "config": public_config_status(config)})
+            return
+
+        if path == "/api/config/status":
+            self.send_json(public_config_status(load_config()))
             return
 
         if path == "/api/search-links":
@@ -111,6 +118,132 @@ class PriceHunterHandler(BaseHTTPRequestHandler):
             self.send_json({"created": created, "count": len(created)})
             return
 
+        if path == "/api/jd/search":
+            client = self.jd_client()
+            raw = client.search_goods(
+                keyword=payload.get("keyword", "").strip(),
+                page_index=int(payload.get("page_index") or 1),
+                page_size=int(payload.get("page_size") or 20),
+                cid1=payload.get("cid1"),
+                cid2=payload.get("cid2"),
+                cid3=payload.get("cid3"),
+                owner=payload.get("owner"),
+                isCoupon=payload.get("is_coupon"),
+                sortName=payload.get("sort_name") or "price",
+                sort=payload.get("sort") or "asc",
+            )
+            self.send_json({"items": extract_goods_items(raw), "raw": unwrap_jd_response(raw)})
+            return
+
+        if path == "/api/jd/jingfen":
+            client = self.jd_client()
+            raw = client.jingfen_query(
+                elite_id=int(payload.get("elite_id") or 24),
+                page_index=int(payload.get("page_index") or 1),
+                page_size=int(payload.get("page_size") or 20),
+            )
+            self.send_json({"items": extract_goods_items(raw), "raw": unwrap_jd_response(raw)})
+            return
+
+        if path == "/api/jd/rank":
+            client = self.jd_client()
+            raw = client.rank_query(
+                rank_id=int(payload.get("rank_id") or 200006),
+                sort_type=int(payload.get("sort_type") or 3),
+                page_index=int(payload.get("page_index") or 1),
+                page_size=int(payload.get("page_size") or 10),
+            )
+            self.send_json({"items": extract_goods_items(raw), "raw": unwrap_jd_response(raw)})
+            return
+
+        if path == "/api/jd/promotion":
+            client = self.jd_client()
+            raw = client.promotion_common_get(
+                material_id=payload.get("material_id", "").strip(),
+                coupon_url=payload.get("coupon_url", "").strip() or None,
+                site_id=payload.get("site_id", "").strip() or None,
+                position_id=payload.get("position_id", "").strip() or None,
+            )
+            self.send_json({"result": unwrap_jd_response(raw), "raw": raw})
+            return
+
+        if path == "/api/jd/bigfield":
+            client = self.jd_client()
+            raw = client.goods_bigfield(
+                sku_ids=payload.get("sku_ids") or [],
+                fields=payload.get("fields") or ["categoryInfo", "imageInfo", "baseBigFieldInfo"],
+                scene_id=int(payload.get("scene_id") or 2),
+            )
+            self.send_json({"items": extract_goods_items(raw), "raw": unwrap_jd_response(raw)})
+            return
+
+        if path == "/api/jd/coupon":
+            client = self.jd_client()
+            raw = client.coupon_query(payload.get("coupon_urls") or [])
+            self.send_json({"result": unwrap_jd_response(raw), "raw": raw})
+            return
+
+        if path == "/api/jd/category":
+            client = self.jd_client()
+            raw = client.category_goods_get(
+                parent_id=int(payload.get("parent_id") or 0),
+                grade=int(payload.get("grade") or 0),
+            )
+            self.send_json({"result": unwrap_jd_response(raw), "raw": raw})
+            return
+
+        if path == "/api/jd/pid":
+            client = self.jd_client()
+            raw = client.user_pid_get(
+                union_id=payload.get("union_id"),
+                child_union_id=payload.get("child_union_id"),
+            )
+            self.send_json({"result": unwrap_jd_response(raw), "raw": raw})
+            return
+
+        if path == "/api/jd/position/query":
+            client = self.jd_client()
+            raw = client.position_query(
+                union_id=payload.get("union_id"),
+                key=payload.get("key"),
+                pageIndex=payload.get("page_index"),
+                pageSize=payload.get("page_size"),
+            )
+            self.send_json({"result": unwrap_jd_response(raw), "raw": raw})
+            return
+
+        if path == "/api/jd/position/create":
+            client = self.jd_client()
+            raw = client.position_create(
+                union_id=payload.get("union_id"),
+                key=payload.get("key"),
+                positionType=payload.get("position_type"),
+                spaceNameList=payload.get("space_name_list"),
+            )
+            self.send_json({"result": unwrap_jd_response(raw), "raw": raw})
+            return
+
+        if path == "/api/jd/import":
+            item = payload.get("item") or {}
+            name = item.get("name") or payload.get("name") or ""
+            if not name:
+                raise ValueError("京东商品缺少名称，不能导入。")
+            product = self.db.create_product({
+                "name": name,
+                "category": "电子数码",
+                "buy_price": float(item.get("buy_price") or item.get("coupon_price") or item.get("price") or 0),
+                "buy_url": item.get("material_url") or "",
+                "include_keywords": self.keywords_from_name(name),
+                "exclude_keywords": ["二手", "维修", "配件", "整机"],
+                "shipping": 18,
+                "packaging": 6,
+                "bargain_rate": 0.02,
+                "min_profit_rate": 0.06,
+                "min_profit_amount": 200,
+            })
+            self.send_json({"product": product})
+            return
+
         if path == "/api/open":
             url = payload.get("url", "")
             if not url.startswith(("http://", "https://")):
@@ -125,6 +258,19 @@ class PriceHunterHandler(BaseHTTPRequestHandler):
             return
 
         self.send_json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
+
+    def jd_client(self) -> JDUnionClient:
+        jd_config = load_config().get("platforms", {}).get("jd", {})
+        return JDUnionClient(JDUnionConfig.from_mapping(jd_config))
+
+    @staticmethod
+    def keywords_from_name(name: str) -> list[str]:
+        words = []
+        for token in name.replace("/", " ").replace("-", " ").split():
+            token = token.strip()
+            if len(token) >= 2 and token not in words:
+                words.append(token)
+        return words[:6]
 
     def analysis(self, product: dict, samples: list[dict]) -> dict:
         rule = CostRule(

@@ -13,9 +13,16 @@
   },
   "platforms": {
     "jd": {
+      "enabled": false,
+      "server_url": "https://router.jd.com/api",
       "app_key": "",
       "app_secret": "",
-      "enabled": false
+      "access_token": "",
+      "site_id": "",
+      "pid": "",
+      "position_id": "",
+      "union_id": "",
+      "auth_key": ""
     },
     "taobao": {
       "app_key": "",

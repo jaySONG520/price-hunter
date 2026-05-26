@@ -7,6 +7,8 @@ data/
 *.db
 *.sqlite
 .env
+config.local.json
+jd_api_doc.txt
 dist/
 build/
 server.log
